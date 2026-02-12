@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D 對戰骰子遊戲</title>
+    <style>
+        :root {
+            --primary: #ff4757;
+            --secondary: #2ed573;
+            --dark: #2f3542;
+            --light: #dfe4ea;
+            --bg: #1e272e;
+            --active-bg: rgba(255, 255, 255, 0.1);
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg);
+            color: var(--light);
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 0;
+            overflow: hidden;
+        }
+
+        /* 遊戲主面板 */
+        .game-board {
+            position: relative;
+            width: 900px;
+            height: 550px;
+            background: linear-gradient(to bottom right, #2c3e50, #000000);
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+            border-radius: 15px;
+            display: flex;
+            overflow: hidden;
+        }
+
+        /* 玩家區塊 */
+        .player {
+            flex: 50%;
+            padding: 80px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            transition: all 0.5s;
+            position: relative;
+        }
+
+        .player-0 { border-right: 1px solid rgba(255,255,255,0.1); }
+        
+        /* 活躍玩家樣式 */
+        .player--active {
+            background-color: var(--active-bg);
+        }
+        .player--active .name {
+            font-weight: bold;
+            color: var(--primary);
+            text-shadow: 0 0 10px rgba(255, 71, 87, 0.5);
+        }
+
+        .name {
+            font-size: 40px;
+            text-transform: uppercase;
+            margin-bottom: 10px;
+            letter-spacing: 2px;
+        }
+
+        .score {
+            font-size: 80px;
+            font-weight: 300;
+            color: var(--primary);
+            margin-bottom: auto;
+        }
+
+        .current-box {
+            background-color: var(--primary);
+            border-radius: 9px;
+            padding: 15px 30px;
+            text-align: center;
+            width: 60%;
+        }
+
+        .current-label {
+            text-transform: uppercase;
+            margin-bottom: 5px;
+            font-size: 14px;
+            color: #fff;
+        }
+
+        .current-score {
+            font-size: 30px;
+            color: #fff;
+        }
+
+        /* 控制按鈕 (中間) */
+        .controls {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            z-index: 10;
+        }
+
+        .btn {
+            background: rgba(255, 255, 255, 0.9);
+            color: #444;
+            border: none;
+            font-family: inherit;
+            font-size: 18px;
+            text-transform: uppercase;
+            cursor: pointer;
+            font-weight: 600;
+            padding: 12px 30px;
+            border-radius: 50px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+            transition: all 0.2s;
+            min-width: 180px;
+        }
+
+        .btn:hover { background: #fff; transform: scale(1.05); }
+        .btn:active { transform: scale(0.95); box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2); }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .btn--new { top: 40px; position: absolute; }
+        
+        /* --- 3D 骰子 CSS --- */
+        .dice-container {
+            width: 100px;
+            height: 100px;
+            perspective: 600px;
+            margin: 0 auto 30px auto;
+        }
+
+        .cube {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            transform-style: preserve-3d;
+            transform: translateZ(-50px) rotateX(0deg) rotateY(0deg);
+            transition: transform 1s cubic-bezier(0.175, 0.885, 0.32, 1.275); /* 彈性動畫 */
+        }
+
+        .face {
+            position: absolute;
+            width: 100px;
+            height: 100px;
+            border: 2px solid #ccc;
+            background: rgba(255, 255, 255, 0.95);
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.1);
+            border-radius: 10px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 0; /* 隱藏文字 */
+        }
+
+        /* 點數繪製 */
+        .dot {
+            width: 18px;
+            height: 18px;
+            background-color: #ff4757;
+            border-radius: 50%;
+            position: absolute;
+            box-shadow: inset 2px 2px 2px rgba(0,0,0,0.2);
+        }
+
+        /* 定義六個面 */
+        .front  { transform: rotateY(0deg) translateZ(50px); }
+        .back   { transform: rotateY(180deg) translateZ(50px); }
+        .right  { transform: rotateY(90deg) translateZ(50px); }
+        .left   { transform: rotateY(-90deg) translateZ(50px); }
+        .top    { transform: rotateX(90deg) translateZ(50px); }
+        .bottom { transform: rotateX(-90deg) translateZ(50px); }
+
+        /* 點數位置佈局 */
+        .face-1 .dot:nth-child(1) { top: 41px; left: 41px; }
+
+        .face-2 .dot:nth-child(1) { top: 20px; left: 20px; }
+        .face-2 .dot:nth-child(2) { bottom: 20px; right: 20px; }
+
+        .face-3 .dot:nth-child(1) { top: 20px; left: 20px; }
+        .face-3 .dot:nth-child(2) { top: 41px; left: 41px; }
+        .face-3 .dot:nth-child(3) { bottom: 20px; right: 20px; }
+
+        .face-4 .dot:nth-child(1) { top: 20px; left: 20px; }
+        .face-4 .dot:nth-child(2) { top: 20px; right: 20px; }
+        .face-4 .dot:nth-child(3) { bottom: 20px; left: 20px; }
+        .face-4 .dot:nth-child(4) { bottom: 20px; right: 20px; }
+
+        .face-5 .dot:nth-child(1) { top: 20px; left: 20px; }
+        .face-5 .dot:nth-child(2) { top: 20px; right: 20px; }
+        .face-5 .dot:nth-child(3) { top: 41px; left: 41px; }
+        .face-5 .dot:nth-child(4) { bottom: 20px; left: 20px; }
+        .face-5 .dot:nth-child(5) { bottom: 20px; right: 20px; }
+
+        .face-6 .dot:nth-child(1) { top: 20px; left: 20px; }
+        .face-6 .dot:nth-child(2) { top: 20px; right: 20px; }
+        .face-6 .dot:nth-child(3) { top: 41px; left: 20px; }
+        .face-6 .dot:nth-child(4) { top: 41px; right: 20px; }
+        .face-6 .dot:nth-child(5) { bottom: 20px; left: 20px; }
+        .face-6 .dot:nth-child(6) { bottom: 20px; right: 20px; }
+
+        /* 勝利狀態 */
+        .player--winner {
+            background-color: #2f3542;
+            color: #2ed573;
+        }
+        .player--winner .name { color: #2ed573; }
+        
+        /* 手機版調整 */
+        @media (max-width: 768px) {
+            .game-board {
+                flex-direction: column;
+                width: 95%;
+                height: 95vh;
+            }
+            .player { padding: 20px; flex: 1; }
+            .controls { top: 50%; width: 100%; align-items: center; gap: 10px; }
+            .btn--new { position: relative; top: 0; margin-bottom: 10px;}
+            .dice-container { margin: 10px auto; transform: scale(0.7); }
+            .score { font-size: 50px; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="game-board">
+    <button class="btn btn--new">🔄 重新開始</button>
+
+    <div class="player player-0 player--active">
+        <h2 class="name" id="name-0">玩家</h2>
+        <p class="score" id="score-0">43</p>
+        <div class="current-box">
+            <div class="current-label">當前得分</div>
+            <p class="current-score" id="current-0">0</p>
+        </div>
+    </div>
+
+    <div class="player player-1">
+        <h2 class="name" id="name-1">電腦 AI</h2>
+        <p class="score" id="score-1">24</p>
+        <div class="current-box">
+            <div class="current-label">當前得分</div>
+            <p class="current-score" id="current-1">0</p>
+        </div>
+    </div>
+
+    <div class="controls">
+        <div class="dice-container">
+            <div class="cube" id="cube">
+                <div class="face face-1 front"><div class="dot"></div></div>
+                <div class="face face-2 back"><div class="dot"></div><div class="dot"></div></div>
+                <div class="face face-3 right"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
+                <div class="face face-4 left"><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
+                <div class="face face-5 top"><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
+                <div class="face face-6 bottom"><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
+            </div>
+        </div>
+
+        <button class="btn btn--roll">🎲 擲骰子</button>
+        <button class="btn btn--hold">📥 保留得分</button>
+    </div>
+</div>
+
+<script>
+    // 遊戲變數
+    let scores, currentScore, activePlayer, playing;
+
+    // DOM 元素
+    const player0El = document.querySelector('.player-0');
+    const player1El = document.querySelector('.player-1');
+    const score0El = document.getElementById('score-0');
+    const score1El = document.getElementById('score-1');
+    const current0El = document.getElementById('current-0');
+    const current1El = document.getElementById('current-1');
+    const cubeEl = document.getElementById('cube');
+    const btnNew = document.querySelector('.btn--new');
+    const btnRoll = document.querySelector('.btn--roll');
+    const btnHold = document.querySelector('.btn--hold');
+
+    // 骰子角度對應表 (X, Y)
+    const diceRotations = {
+        1: [0, 0],      // Front
+        2: [0, 180],    // Back
+        3: [0, -90],    // Right
+        4: [0, 90],     // Left
+        5: [-90, 0],    // Top
+        6: [90, 0]      // Bottom
+    };
+
+    // 初始化函數
+    const init = () => {
+        scores = [0, 0];
+        currentScore = 0;
+        activePlayer = 0; // 0 是玩家, 1 是電腦
+        playing = true;
+
+        score0El.textContent = 0;
+        score1El.textContent = 0;
+        current0El.textContent = 0;
+        current1El.textContent = 0;
+
+        cubeEl.style.transform = `translateZ(-50px) rotateX(0deg) rotateY(0deg)`;
+
+        player0El.classList.remove('player--winner');
+        player1El.classList.remove('player--winner');
+        player0El.classList.add('player--active');
+        player1El.classList.remove('player--active');
+        
+        enableButtons();
+    };
+
+    init();
+
+    // 切換玩家
+    const switchPlayer = () => {
+        document.getElementById(`current-${activePlayer}`).textContent = 0;
+        currentScore = 0;
+        activePlayer = activePlayer === 0 ? 1 : 0;
+        player0El.classList.toggle('player--active');
+        player1El.classList.toggle('player--active');
+
+        // 如果輪到電腦，觸發 AI
+        if (activePlayer === 1 && playing) {
+            disableButtons();
+            setTimeout(computerTurn, 1000); // 延遲讓玩家反應過來
+        } else if (playing) {
+            enableButtons();
+        }
+    };
+
+    // 擲骰子邏輯
+    const rollDice = () => {
+        if (playing) {
+            // 1. 產生 1-6 隨機數
+            const dice = Math.trunc(Math.random() * 6) + 1;
+
+            // 2. 旋轉骰子動畫 (加上多圈旋轉以增加動感)
+            const rot = diceRotations[dice];
+            // 隨機增加 1~2 圈 (360deg) 讓動畫看起來是在滾動
+            const extraRotX = 360 * (Math.floor(Math.random() * 2) + 1);
+            const extraRotY = 360 * (Math.floor(Math.random() * 2) + 1);
+            
+            cubeEl.style.transform = `translateZ(-50px) rotateX(${rot[0] + extraRotX}deg) rotateY(${rot[1] + extraRotY}deg)`;
+
+            // 3. 檢查是否為 1
+            if (dice !== 1) {
+                // 不是 1: 加分
+                currentScore += dice;
+                document.getElementById(`current-${activePlayer}`).textContent = currentScore;
+            } else {
+                // 是 1: 分數歸零，換人
+                // 為了讓動畫跑完再歸零，加一點延遲
+                setTimeout(() => {
+                    switchPlayer();
+                }, 800);
+            }
+            return dice;
+        }
+    };
+
+    // 保留分數邏輯
+    const holdScore = () => {
+        if (playing) {
+            // 1. 加分到總分
+            scores[activePlayer] += currentScore;
+            document.getElementById(`score-${activePlayer}`).textContent = scores[activePlayer];
+
+            // 2. 檢查獲勝 (>= 100)
+            if (scores[activePlayer] >= 100) {
+                playing = false;
+                document.querySelector(`.player-${activePlayer}`).classList.add('player--winner');
+                document.querySelector(`.player-${activePlayer}`).classList.remove('player--active');
+                
+                let winnerName = activePlayer === 0 ? "玩家" : "電腦";
+                alert(`🎉 遊戲結束！${winnerName} 獲勝！`);
+            } else {
+                // 3. 換人
+                switchPlayer();
+            }
+        }
+    };
+
+    // --- 電腦 AI 邏輯 ---
+    const computerTurn = async () => {
+        if (!playing || activePlayer !== 1) return;
+
+        // 簡單策略：
+        // 1. 只要 currentScore < 15 就繼續擲
+        // 2. 或者 如果 (currentScore + totalScore >= 100) 就直接 Hold
+        // 3. 避免一直擲到 1
+
+        const checkAI = () => {
+            if (!playing || activePlayer !== 1) return;
+
+            // AI 決策
+            const shouldHold = (currentScore >= 15) || (scores[1] + currentScore >= 100);
+
+            if (shouldHold) {
+                holdScore();
+            } else {
+                let rolled = rollDice();
+                // 如果擲到 1，rollDice 函數內部會處理 switchPlayer，我們只需等待
+                if (rolled !== 1) {
+                    // 如果沒擲到 1，等待一下再決定下一步
+                    setTimeout(checkAI, 1500); 
+                }
+            }
+        };
+
+        checkAI();
+    };
+
+    // 按鈕事件綁定
+    btnRoll.addEventListener('click', rollDice);
+    btnHold.addEventListener('click', holdScore);
+    btnNew.addEventListener('click', init);
+
+    function disableButtons() {
+        btnRoll.disabled = true;
+        btnHold.disabled = true;
+    }
+
+    function enableButtons() {
+        btnRoll.disabled = false;
+        btnHold.disabled = false;
+    }
+
+</script>
+</body>
+</html>
